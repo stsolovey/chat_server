@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/golang-jwt/jwt"
@@ -98,9 +101,18 @@ func main() {
 		}
 	})
 
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	server := makeServer(log)
 
-	log.Println("Starting server at :8080")
+	go func() {
+		if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+			log.WithError(err).Panic("Server stopped unexpectedly")
+		}
+	}()
+
+	<-ctx.Done()
 
 	if err := server.ListenAndServe(); err != nil {
 		log.WithError(err).Panic("Error starting server: %w\n", err)
