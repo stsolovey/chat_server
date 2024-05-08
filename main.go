@@ -33,6 +33,19 @@ func generateToken(username string, mySigningKey []byte) (string, error) {
 	return tokenString, nil
 }
 
+func makeServer(log *logrus.Logger) *http.Server {
+	server := &http.Server{
+		Addr:         ":8080",
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	log.Println("Starting server at :8080")
+
+	return server
+}
+
 func main() {
 	log := logrus.New()
 	log.SetFormatter(&logrus.JSONFormatter{})
@@ -85,12 +98,7 @@ func main() {
 		}
 	})
 
-	server := &http.Server{
-		Addr:         ":8080",
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
-		IdleTimeout:  60 * time.Second,
-	}
+	server := makeServer(log)
 
 	log.Println("Starting server at :8080")
 
