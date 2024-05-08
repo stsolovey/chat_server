@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,9 +12,15 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+var errAssertingClaimsJWT = errors.New("error asserting claims to jwt.MapClaims")
+
 func generateToken(username string, mySigningKey []byte) (string, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
-	claims := token.Claims.(jwt.MapClaims)
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errAssertingClaimsJWT
+	}
 
 	claims["username"] = username
 	claims["exp"] = time.Now().Add(time.Hour * 24).Unix()
@@ -35,7 +42,7 @@ func main() {
 		log.WithError(err).Panic("Error loading .env file")
 	}
 
-	var mySigningKey = []byte(os.Getenv("JWT_SECRET"))
+	mySigningKey := []byte(os.Getenv("JWT_SECRET"))
 	if len(mySigningKey) == 0 {
 		log.WithError(err).Panic("JWT_SECRET is not set")
 	}
@@ -73,11 +80,21 @@ func main() {
 			Path:  "/",
 		})
 
-		w.Write([]byte("Logged in successfully with token: " + tokenString))
+		if _, err := w.Write([]byte("Logged in successfully with token: " + tokenString)); err != nil {
+			log.WithError(err).Panic("Failed to write response")
+		}
 	})
 
+	server := &http.Server{
+		Addr:         ":8080",
+		WriteTimeout: 15 * time.Second,
+		ReadTimeout:  15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
 	log.Println("Starting server at :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Fatalf("Error starting server: %s\n", err)
+
+	if err := server.ListenAndServe(); err != nil {
+		log.WithError(err).Panic("Error starting server: %w\n", err)
 	}
 }
